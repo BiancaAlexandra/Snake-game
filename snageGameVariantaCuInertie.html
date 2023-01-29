@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<style>
+* {
+    box-sizing: border-box;
+}
+canvas {
+    border:1px solid #d3d3d3;
+    background-color: #f1f1f1;
+}
+#SCOR {
+    display: block;
+    border:1px solid #d3d3d3;
+    background-color: #f1f1f1;
+    text-align: center;
+    font-size: 45px;
+}
+#gameOver {
+    display: none;
+    background-image: url("gameover.jpg");
+    background-size: contain;
+    background-repeat: no-repeat;
+}
+</style>
+</head>
+
+<body onload="startGame()">
+<div id="SCOR">
+</div>
+<div id="gameOver" style="width: 450px; height: 450px;">
+</div>    
+<script>
+
+var snake = [];
+var myApple;
+var box = 30; //15 patratele => matrice 15X15
+var dimMatrix = 15;
+var dimCanvas = 450;
+//var refresh = 200;
+var refresh = 100;
+var scor = 0;
+var gameOver;
+var directie;
+var bombs = [];
+var snakeXInainte;
+var snakeYInainte;
+var explosion;
+
+document.getElementById('SCOR').setAttribute("style","width:450px;height:50px");
+document.getElementById("SCOR").innerHTML = "Scor : " + scor;
+
+var myGameArea = {
+
+    canvas : document.createElement("canvas"),
+
+    start : function() {
+        this.canvas.width = dimCanvas;
+        this.canvas.height = dimCanvas;
+        this.context = this.canvas.getContext("2d");
+        document.body.insertBefore(this.canvas, document.body.childNodes[0]);//canvasul este primul copil al corpului
+
+        this.interval = setInterval(updateGameArea, refresh);
+        
+        //apasarea de taste pentru ca sarpele sa se miste
+        window.addEventListener('keydown', function (e) {
+            myGameArea.key = e.keyCode;
+        })
+        window.addEventListener('keyup', function (e) {
+            myGameArea.key = false;
+        })
+    },
+
+    clear : function() {
+        this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    },
+
+    gameOver : function() {
+        myGameArea.canvas.style.display = "none";
+        document.getElementById("gameOver").style.display = "inline-block";
+    }
+}
+
+function startGame() {
+    myGameArea.start();
+
+    //construiesc/declar diverse componente
+    snake[0] = new component(box, box, "green", 2 * box, 0);
+    snake[1] = new component(box, box, "green", box, 0);
+    snake[2] = new component(box, box, "green", 0, 0);
+    snakeXInainte = snake[2].x;
+    snakeYInainte = snake[2].y;
+    myApple = new componentApple(box, box, "red");
+    myEnemy = new componentEnemy(box, box, "black");
+}
+
+//constructor pentru componenta de tip snake
+function component(width, height, color, x, y) {
+    this.width = width;
+    this.height = height;
+    this.speedX = 0;
+    this.speedY = 0;
+    this.x = x;
+    this.y = y;
+
+    //redesenare componenta dupa ce s-a sters panza
+    this.update = function() {
+        ctx = myGameArea.context;
+        ctx.fillStyle = color;
+        ctx.fillRect(this.x, this.y, this.width, this.height);
+    }
+
+    //pozitionarea componentelor / miscarea sarpelui
+    this.newPos = function() {
+        this.x += this.speedX;
+        this.y += this.speedY;  
+    } 
+
+    //daca sarpele mananca un mar
+    this.crashWithTheApple = function(appleObject) {
+        var myleft = this.x;
+        var myright = this.x + this.width;
+        var mytop = this.y;
+        var mybottom = this.y + this.height;
+        var otherleft = appleObject.x;
+        var otherright = appleObject.x + (appleObject.width);
+        var othertop = appleObject.y;
+        var otherbottom = appleObject.y + (appleObject.height);
+        var crash = true;
+        if((myleft != otherleft) || (mytop != othertop) || (myright != otherright) || (mybottom != otherbottom)) {
+            crash = false;
+        }
+        return crash;
+    }
+
+    //daca sarpele mananca un mar
+    this.crashWithTheWalls = function() {
+        var myleft = this.x;
+        var myright = this.x + this.width;
+        var mytop = this.y;
+        var mybottom = this.y + this.height;
+        var crash = false;
+        if((myleft < 0) || (mytop < 0) || (myright > dimCanvas) || (mybottom > dimCanvas)) {
+            crash = true;
+        }
+        return crash;
+    }
+}
+
+function componentApple(width, height, color) {
+    var aux;
+    var nr;
+    this.width = width;
+    this.height = height;
+
+    do{
+        nr = 0;
+        aux = Math.floor(Math.random() * dimMatrix); // returns a random integer from 0 to dimMatrix - 1
+        for(var i = 0; i < snake.length; i++) {
+            if(snake[i].x == aux)
+                nr++;
+        }
+    }while(nr != 0);
+    this.x = aux * box;
+
+    do{
+        nr = 0;
+        aux = Math.floor(Math.random() * dimMatrix); // returns a random integer from 0 to dimMatrix - 1
+        for(var i = 0; i < snake.length; i++) {
+            if(snake[i].y == aux)
+                nr++;
+        }
+    }while(nr != 0);
+    this.y = aux * box;
+
+    this.update = function() {
+        ctx = myGameArea.context;
+        ctx.fillStyle = color;
+        ctx.fillRect(this.x, this.y, this.width, this.height);
+    }
+}
+
+function componentEnemy(width, height, color) {
+    var aux;
+    var nr;
+    this.width = width;
+    this.height = height;
+
+    do{
+        nr = 0;
+        aux = Math.floor(Math.random() * dimMatrix); // returns a random integer from 0 to dimMatrix - 1
+        for(var i = 0; i < snake.length; i++) {
+            if(snake[i].x == aux)
+                nr++;
+        }
+    }while(nr != 0);
+    this.x = aux * box;
+
+    do{
+        nr = 0;
+        aux = Math.floor(Math.random() * dimMatrix); // returns a random integer from 0 to dimMatrix - 1
+        for(var i = 0; i < snake.length; i++) {
+            if(snake[i].y == aux)
+                nr++;
+        }
+    }while(nr != 0);
+    this.y = aux * box;
+
+    this.update = function() {
+        ctx = myGameArea.context;
+        ctx.fillStyle = color;
+        ctx.fillRect(this.x, this.y, this.width, this.height);
+    }
+
+    this.move = function() {
+        var variabila1, variabila2;
+        variabila1 = Math.floor(Math.random() * 2);
+        variabila2 = Math.floor(Math.random() * 2);
+        if(variabila1 == 0) {
+            if(variabila2 == 0) {
+                this.x = this.x + box;
+                if(this.x >= dimCanvas) {
+                    this.x = 0;
+                }
+            }
+            else {
+                this.x = this.x - box;
+                if(this.x < 0) {
+                    this.x = dimCanvas - box;
+                }
+            }
+        }
+        else {
+            if(variabila2 == 0) {
+                this.y = this.y + box;
+                if(this.y >= dimCanvas) {
+                    this.y = 0;
+                }
+            }
+            else {
+                this.y = this.y - box;
+                if(this.y < 0) {
+                    this.y = dimCanvas - box;
+                }
+            }
+        }
+    }
+}
+
+function componentBomb(width, height, color, x, y) {
+    this.width = width;
+    this.height = height;
+    this.x = x;
+    this.y = y;
+
+    this.startTime = new Date();
+
+    this.timePassed = function(i) {
+        var endTime = new Date();
+        var timeDiff = endTime - this.startTime; 
+        timeDiff /= 1000;
+        var seconds = Math.round(timeDiff); 
+
+        if((seconds > 3) && (bombs.length > 0)){
+            console.log("nr bombe = " + bombs.length);
+            console.log("i = " + i);
+            this.drawExplosion();
+            this.eraseExplosion(); 
+            this.eraseBomb(i);
+        }
+    }
+
+    this.range = function() {
+        var range = [];
+
+        if((this.x >= 0) && (this.x < dimCanvas) && (this.y >= 0) && (this.y < dimCanvas))
+            range.push([this.x, this.y]);
+
+        if((this.x >= 0) && (this.x < dimCanvas) && (this.y - 1 * box >= 0) && (this.y - 1 * box < dimCanvas))
+            range.push([this.x, this.y - 1 * box]);
+
+        if((this.x >= 0) && (this.x < dimCanvas) && (this.y - 2 * box >= 0) && (this.y - 2 * box < dimCanvas))
+            range.push([this.x, this.y - 2 * box]);
+
+        if((this.x >= 0) && (this.x < dimCanvas) && (this.y + 1 * box >= 0) && (this.y + 1 * box < dimCanvas))
+            range.push([this.x, this.y + 1 * box]);
+
+        if((this.x >= 0) && (this.x < dimCanvas) && (this.y + 2 * box >= 0) && (this.y + 2 * box < dimCanvas))
+            range.push([this.x, this.y + 2 * box]);
+
+        if((this.x + 1 * box >= 0) && (this.x + 1 * box < dimCanvas) && (this.y - 1 * box >= 0) && (this.y - 1 * box < dimCanvas))
+            range.push([this.x + 1 * box, this.y - 1 * box]);
+
+        if((this.x + 1 * box >= 0) && (this.x + 1 * box < dimCanvas) && (this.y >= 0) && (this.y < dimCanvas))
+            range.push([this.x + 1 * box, this.y]);
+
+        if((this.x + 1 * box >= 0) && (this.x + 1 * box < dimCanvas) && (this.y + 1 * box >= 0) && (this.y + 1 * box < dimCanvas))
+            range.push([this.x + 1 * box, this.y + 1 * box]);
+
+        if((this.x - 1 * box >= 0) && (this.x - 1 * box < dimCanvas) && (this.y - 1 * box >= 0) && (this.y - 1 * box < dimCanvas))
+            range.push([this.x - 1 * box, this.y - 1 * box]);
+
+        if((this.x - 1 * box >= 0) && (this.x - 1 * box < dimCanvas) && (this.y >= 0) && (this.y < dimCanvas))
+            range.push([this.x - 1 * box, this.y]);
+
+        if((this.x - 1 * box >= 0) && (this.x - 1 * box < dimCanvas) && (this.y + 1 * box >= 0) && (this.y + 1 * box < dimCanvas))
+            range.push([this.x - 1 * box, this.y + 1 * box]);
+
+        if((this.x - 2 * box >= 0) && (this.x - 2 * box < dimCanvas) && (this.y >= 0) && (this.y < dimCanvas))
+            range.push([this.x - 2 * box, this.y]);
+
+        if((this.x + 2 * box >= 0) && (this.x + 2 * box < dimCanvas) && (this.y >= 0) && (this.y < dimCanvas))
+            range.push([this.x + 2 * box, this.y]);
+
+        return range;
+    }
+
+    this.drawExplosion = function() {
+        var range = this.range();
+        var color = "orange";
+        ctx = myGameArea.context;
+        ctx.fillStyle = color;
+
+        for(var i = 0; i < range.length; i++) {
+            console.log("orange");
+            ctx.fillRect(range[i][0], range[i][1], this.width, this.height);
+        }
+    }
+
+    this.eraseExplosion = function() {
+        var range = this.range();
+        var color = "#f1f1f1";
+        ctx = myGameArea.context;
+        ctx.fillStyle = color;
+        setTimeout(function() {
+            for(var i = 0; i < range.length; i++) {
+                console.log("gry");
+                ctx.fillRect(range[i][0], range[i][1], this.width, this.height);
+            }
+        },250);
+    }
+
+    this.eraseBomb = function(i) {
+        for(var j = i; j <= bombs.length - 1; j++) {
+            bombs[j] = bombs[j+1];
+            bombs.pop();
+        }
+    }
+
+    this.update = function() {
+        ctx = myGameArea.context;
+        ctx.fillStyle = color;
+        ctx.fillRect(this.x, this.y, this.width, this.height);
+    }
+}
+
+function updateGameArea() {
+    myGameArea.clear();  
+    //inertie
+    if(myGameArea.key == false) {
+        snakeXInainte = snake[2].x;
+        snakeYInainte = snake[2].y;
+        reorderSnake();
+        if(directie == "left") {
+            snake[0].x = snake[1].x - box;
+            snake[0].y= snake[1].y;
+        }
+        if(directie == "right") {
+            snake[0].x = snake[1].x + box;
+            snake[0].y= snake[1].y;
+        }
+        if(directie == "up") {
+            snake[0].y = snake[1].y - box;
+            snake[0].x= snake[1].x;
+        }
+        if(directie == "down") {
+            snake[0].y = snake[1].y + box;
+            snake[0].x= snake[1].x;
+        }
+    }
+    else {
+        //left
+        if ((myGameArea.key && myGameArea.key == 37)) {
+            snakeXInainte = snake[2].x;
+            snakeYInainte = snake[2].y;
+            if(directie == "right") {
+                myGameArea.gameOver();
+            }
+            directie = "left";
+            reorderSnake();
+
+            snake[0].x = snake[1].x - box;
+            snake[0].y= snake[1].y;
+        }
+        //right
+        if ((myGameArea.key && myGameArea.key == 39)) {
+            snakeXInainte = snake[2].x;
+            snakeYInainte = snake[2].y;
+            if(directie == "left") {
+                myGameArea.gameOver();
+            }
+            directie = "right";
+            reorderSnake();
+
+            snake[0].x = snake[1].x + box;
+            snake[0].y= snake[1].y;
+        }
+        //up
+        if ((myGameArea.key && myGameArea.key == 38)) {
+            snakeXInainte = snake[2].x;
+            snakeYInainte = snake[2].y;
+            if(directie == "down") {
+                myGameArea.gameOver();
+            }
+            directie = "up";
+            reorderSnake();
+
+            snake[0].y = snake[1].y - box;
+            snake[0].x= snake[1].x;
+        }
+        //down
+        if ((myGameArea.key && myGameArea.key == 40)) {
+            snakeXInainte = snake[2].x;
+            snakeYInainte = snake[2].y;
+            if(directie == "up") {
+                myGameArea.gameOver();
+            }
+            directie = "down";
+            reorderSnake();
+
+            snake[0].y = snake[1].y + box;
+            snake[0].x= snake[1].x;
+        }
+        //space
+        if ((myGameArea.key && myGameArea.key == 32)) {
+            bombs[bombs.length] = new componentBomb(box, box, "pink", snakeXInainte, snakeYInainte);
+        }
+    }
+    //redesenez marul
+    myApple.update();
+    myEnemy.update();
+    myEnemy.move();
+
+    //snake head(snake[0]) + bomb range => G.O.
+    for(var i = 0; i < bombs.length; i++) {
+        var range = bombs[i].range();
+        for(var j = 0; j < range.length; j++) {
+            if((snake[0].x == range[j][0]) && (snake[0].y == range[j][1])) {
+                myGameArea.gameOver();
+            }
+        }
+    }
+
+    //enemy + bomb range => +1pct
+    for(var i = 0; i < bombs.length; i++) {
+        var range = bombs[i].range();
+        for(var j = 0; j < range.length; j++) {
+            if((myEnemy.x == range[j][0]) && (myEnemy.y == range[j][1])) {
+                scor++;
+                document.getElementById("SCOR").innerHTML = "Scor : " + scor;
+                myEnemy = new componentEnemy(box, box, "black");
+            }
+        }
+    }
+
+    //enemy + snake head => G.O.
+    if((myEnemy.x == snake[0].x) && (myEnemy.y == snake[0].y)) {
+        myGameArea.gameOver();
+    }
+
+    //enemy + snake tail => -1pct
+    for(var i = 1; i < snake.length; i++) {
+        if((snake[i].x == myEnemy.x) && (snake[i].y == myEnemy.y)) {
+            scor--;
+            document.getElementById("SCOR").innerHTML = "Scor : " + scor;
+            myEnemy = new componentEnemy(box, box, "black");
+        }
+    }
+
+    if(snake[0].crashWithTheApple(myApple) == true) {
+        scor++;
+        document.getElementById("SCOR").innerHTML = "Scor : " + scor;
+        myApple = new componentApple(box, box, "red");
+    }
+
+    if(snake[0].crashWithTheWalls()) {
+        myGameArea.gameOver();
+    }
+
+    if(bombs.length > 0) {
+        for(var i = 0; i < bombs.length; i++) {
+            bombs[i].update();
+            bombs[i].timePassed(i);
+        }
+    }
+
+    //desenez sarple
+    for(var i = 0; i < snake.length; i++) {  
+        snake[i].update();
+    }
+    clearmove();
+}
+
+function clearmove() {
+    for(var i = 0; i < snake.length; i++) {
+        snake[i].speedX = 0; 
+        snake[i].speedY = 0; 
+    }
+}
+
+function reorderSnake() {
+    var aux;
+    for(var i = 2; i > 0; i--) {
+        aux = snake[i];
+        snake[i] = snake[i-1];
+        snake[i-1] = aux;
+    }
+}
+
+function afisareSnake() {
+    for(var i = 2; i >= 0; i--) {
+        console.log("snake " + i + ": " + snake[i].x + " " + snake[i].y);
+    }
+}
+</script>
+
+</body>
+</html>
